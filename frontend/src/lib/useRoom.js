@@ -19,6 +19,12 @@ function getClientId() {
   }
 }
 
+/** The server sends the time left; turn it into an end time on our own clock. */
+function localTimer(timer) {
+  if (!timer) return null
+  return { ...timer, endsAt: timer.running ? Date.now() + timer.remaining : null }
+}
+
 /**
  * Connects to a project and keeps a local copy of the shared animation.
  * The doc lives in a stable store (it changes on every pointer move);
@@ -40,6 +46,10 @@ export function useRoom(projectId, guestName) {
   const [fatal, setFatal] = useState(null) // { code, message } — stop reconnecting
   const [savedAt, setSavedAt] = useState(null)
   const [unsaved, setUnsaved] = useState(false)
+  // The shared countdown, with `endsAt` on this computer's clock. `timerEvent`
+  // changes on every start/pause/round/done so the UI can react (e.g. a chime).
+  const [timer, setTimer] = useState(null)
+  const [timerEvent, setTimerEvent] = useState(null)
 
   const scheduled = useRef(false)
   const changed = useCallback(() => {
@@ -77,7 +87,12 @@ export function useRoom(projectId, guestName) {
             setProject(msg.project)
             setUsers(msg.users)
             setPresence(Object.fromEntries(msg.users.map((u) => [u.cid, { frameId: u.frameId, cursor: null }])))
+            setTimer(localTimer(msg.timer))
             setStatus('connected')
+            break
+          case 'timer':
+            setTimer(localTimer(msg.timer))
+            setTimerEvent({ type: msg.event, by: msg.by, at: Date.now() })
             break
           case 'resync':
             store.doc = msg.doc
@@ -178,6 +193,8 @@ export function useRoom(projectId, guestName) {
     fatal,
     savedAt,
     unsaved,
+    timer,
+    timerEvent,
     strokeOp,
     frameOp,
     send,

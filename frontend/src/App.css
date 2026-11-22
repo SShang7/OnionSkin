@@ -585,6 +585,169 @@
   grid-template-columns: auto 1fr;
 }
 
+/* ---------- shared timer ---------- */
+.timer {
+  position: relative;
+}
+.timer-button {
+  position: relative;
+  height: 32px;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+.timer-button.is-active {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
+  min-width: 92px;
+}
+/* A bar along the bottom that fills up as time runs out. */
+.timer-button.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: calc(var(--progress) * 100%);
+  background: currentColor;
+  opacity: 0.6;
+}
+.timer-button.is-paused {
+  color: var(--muted);
+}
+.timer-button.is-low {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.timer-button.is-done {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  animation: timer-flash 0.6s ease-in-out 3;
+}
+@keyframes timer-flash {
+  50% {
+    filter: brightness(1.25);
+    transform: scale(1.05);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .timer-button.is-done {
+    animation: none;
+  }
+}
+.timer-label {
+  font-weight: 600;
+}
+.timer-round {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+.timer-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: 290px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+.timer-heading {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.timer-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.timer-presets .btn {
+  padding: 0 6px;
+}
+.timer-custom {
+  display: flex;
+  gap: 6px;
+}
+.timer-custom input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
+.timer-custom input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.timer-custom input.is-invalid {
+  border-color: var(--danger);
+}
+.timer-error {
+  margin: -4px 0 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+.timer-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.timer-option input {
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+.timer-option span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.timer-option.is-sub {
+  margin-left: 22px;
+}
+.timer-option.is-disabled {
+  color: var(--muted);
+  cursor: default;
+}
+.timer-sound {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+}
+.timer-big {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.timer-meta {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  text-align: center;
+}
+.timer-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.timer-actions .btn {
+  padding: 0 6px;
+}
+
 /* ---------- toolbar ---------- */
 .toolbar {
   display: flex;
@@ -852,6 +1015,19 @@
   .invite-button {
     width: 36px;
     padding: 0;
+  }
+  .timer-button:not(.is-active):not(.is-done) .timer-label {
+    display: none;
+  }
+  .timer-button.is-active {
+    min-width: 0;
+  }
+  .timer-pop {
+    position: fixed;
+    top: 56px;
+    left: 16px;
+    right: 16px;
+    width: auto;
   }
   .workspace {
     grid-template-columns: 1fr;

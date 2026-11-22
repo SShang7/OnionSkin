@@ -6,6 +6,8 @@ Create an account to save projects. Each project has an invite link. Anyone with
 
 Every day there's a new **daily prompt**, the same for everyone, such as "A flower blooming" or "A walk cycle". It shows on the home page. Signed in, **Start drawing** opens that day's project; opening it again later the same day returns to it. Each day you draw something in your daily project adds to your streak, and the last 7 days are shown as dots. The day changes at your local midnight.
 
+For timed practice like gesture drawing, use **Timer** in the editor. Anyone in the project can start one, and everyone sees the same countdown. Pick a preset or type a time such as `1:30`, `45s`, or `2`, which means 2 minutes. Turn on **Repeat rounds** to restart the countdown each time it ends. With **New frame each round**, a blank frame is added at the end of each round and everyone moves to it, so each pose gets its own frame. A chime plays when time is up; each person can turn it off for themselves. If everyone leaves, the timer pauses.
+
 ## Run it
 
 ```powershell
@@ -69,7 +71,7 @@ Drag thumbnails in the timeline to reorder frames.
 - `backend/server.js`: the Node HTTP server. It wires together:
   - `api.js`: JSON endpoints for accounts and projects.
   - `auth.js`: scrypt password hashes, 30-day HttpOnly session cookies, and limits on repeated login attempts.
-  - `rooms.js`: live editing over WebSocket (`ws`). An open project is kept in memory, saved to the database at most every 2 seconds while people draw, and saved again when the last person leaves.
+  - `rooms.js`: live editing over WebSocket (`ws`). An open project is kept in memory, saved to the database at most every 2 seconds while people draw, and saved again when the last person leaves. It also runs each project's shared timer, so everyone sees a round end at the same moment.
   - `db.js`: the SQLite schema and queries, using Node's built-in `node:sqlite`. Older databases get new columns added on startup.
   - `daily.js`: the prompt for each date (a stored AI prompt, or the built-in list as a fallback) and streak counting.
   - `promptgen.js`: asks Claude for new batches of prompts and stores them ahead of time. `prompts-cli.js` is the review script.

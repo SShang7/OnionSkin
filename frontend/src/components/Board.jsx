@@ -8,13 +8,14 @@ import Icon from './Icon.jsx'
 import Logo from './Logo.jsx'
 import HexInput from './HexInput.jsx'
 import ProjectTitle from './ProjectTitle.jsx'
+import TimerControl from './TimerControl.jsx'
 import { formatDay } from '../lib/daily.js'
 
 const SWATCHES = ['#111111', '#e03131', '#f08c00', '#2f9e44', '#1971c2', '#7048e8', '#d6336c', '#868e96']
 const THUMBNAIL_DELAY_MS = 3000
 
 export default function Board({ projectId, guestName, signedIn, onExit }) {
-  const { doc, version, status, me, users, presence, project, setProject, fatal, savedAt, unsaved, strokeOp, frameOp, send, onOp } =
+  const { doc, version, status, me, users, presence, project, setProject, fatal, savedAt, unsaved, timer, timerEvent, strokeOp, frameOp, send, onOp } =
     useRoom(projectId, guestName)
   const frames = doc.frames
 
@@ -58,6 +59,11 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
         if (op.type === 'frame_add' && op.frameId === pendingSelectRef.current) {
           pendingSelectRef.current = null
           setAwaitingFrame(false)
+          setCurrentId(op.frameId)
+        }
+        // A new timer round added a frame: everyone moves to it for the next pose.
+        if (op.type === 'frame_add' && op.timer) {
+          setPlaying(false)
           setCurrentId(op.frameId)
         }
         // If someone deletes the frame I'm on, move to its neighbour.
@@ -276,6 +282,7 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
           </div>
         )}
         <div className="spacer" />
+        <TimerControl timer={timer} timerEvent={timerEvent} send={send} />
         <ul className="avatars" aria-label="People in this project">
           {users.map((u) => (
             <li

@@ -8,6 +8,8 @@ import { dailyInfo } from './daily.js'
 const SAVE_DELAY_MS = 2000 // save at most every 2 s while people are drawing
 const UNLOAD_AFTER_MS = 5 * 60 * 1000 // drop empty rooms from memory after 5 min
 const MAX_THUMBNAIL_CHARS = 150_000
+const TIMER_MIN_S = 5
+const TIMER_MAX_S = 60 * 60
 const USER_COLORS = ['#e8590c', '#1c7ed6', '#2f9e44', '#ae3ec9', '#f08c00', '#0c8599', '#d6336c', '#5f3dc4']
 
 /** Live projects currently loaded in memory, by project id. */
@@ -21,7 +23,7 @@ function loadRoom(id) {
   }
   const doc = projects.loadDoc(id)
   if (!doc) return null
-  room = { id, doc, clients: new Map(), colorIndex: 0, dirty: false, saveTimer: null, unloadTimer: null }
+  room = { id, doc, clients: new Map(), colorIndex: 0, dirty: false, saveTimer: null, unloadTimer: null, timer: null }
   rooms.set(id, room)
   return room
 }
@@ -69,6 +71,7 @@ export function closeRoom(id) {
   if (!room) return
   clearTimeout(room.saveTimer)
   clearTimeout(room.unloadTimer)
+  clearTimeout(room.timer?.handle)
   rooms.delete(id)
   for (const ws of room.clients.keys()) {
     send(ws, { type: 'deleted' })
@@ -78,6 +81,100 @@ export function closeRoom(id) {
 
 export function saveAllRooms() {
   for (const room of rooms.values()) save(room)
+}
+
+// --- shared countdown timer ---
+// One timer per project, visible to everyone in it. The server owns it so all
+// clients agree on when a round ends. Clients get the time left, not a clock
+// time, so their clocks don't need to match the server's.
+
+function timerView(timer) {
+  if (!timer) return null
+  const { duration, repeat, newFrame, round, setBy } = timer
+  const running = timer.endsAt != null
+  const remaining = running ? Math.max(0, timer.endsAt - Date.now()) : timer.remaining
+  return { duration, running, remaining, repeat, newFrame, round, setBy }
+}
+
+function broadcastTimer(room, event, by) {
+  broadcast(room, { type: 'timer', timer: timerView(room.timer), event, by })
+}
+
+function stopTimer(room) {
+  clearTimeout(room.timer?.handle)
+  room.timer = null
+}
+
+function scheduleTimer(room) {
+  const timer = room.timer
+  clearTimeout(timer.handle)
+  timer.handle = setTimeout(() => timerEnded(room), Math.max(0, timer.endsAt - Date.now()))
+}
+
+function timerEnded(room) {
+  const timer = room.timer
+  if (!timer || timer.endsAt == null) return
+  if (!timer.repeat) {
+    room.timer = null
+    broadcastTimer(room, 'done')
+    return
+  }
+  // Next round. For gesture practice, each round can start on a fresh frame.
+  if (timer.newFrame) {
+    const op = { type: 'frame_add', frameId: randomUUID(), by: timer.setById, timer: true }
+    if (applyOp(room.doc, op)) {
+      markDirty(room)
+      broadcast(room, op)
+    }
+  }
+  timer.round++
+  timer.endsAt = Date.now() + timer.duration * 1000
+  scheduleTimer(room)
+  broadcastTimer(room, 'round')
+}
+
+function handleTimer(room, msg, me) {
+  const timer = room.timer
+  switch (msg.type) {
+    case 'timer_start': {
+      if (!isNum(msg.duration)) return
+      const duration = Math.round(Math.min(TIMER_MAX_S, Math.max(TIMER_MIN_S, msg.duration)))
+      stopTimer(room)
+      const repeat = msg.repeat === true
+      room.timer = {
+        duration,
+        repeat,
+        newFrame: repeat && msg.newFrame === true,
+        round: 1,
+        setBy: me.name,
+        setById: me.id,
+        endsAt: Date.now() + duration * 1000,
+        remaining: null,
+        handle: null,
+      }
+      scheduleTimer(room)
+      break
+    }
+    case 'timer_pause':
+      if (!timer || timer.endsAt == null) return
+      clearTimeout(timer.handle)
+      timer.remaining = Math.max(0, timer.endsAt - Date.now())
+      timer.endsAt = null
+      break
+    case 'timer_resume':
+      if (!timer || timer.endsAt != null) return
+      timer.endsAt = Date.now() + timer.remaining
+      timer.remaining = null
+      scheduleTimer(room)
+      break
+    case 'timer_stop':
+      if (!timer) return
+      stopTimer(room)
+      break
+    default:
+      return
+  }
+  broadcastTimer(room, msg.type.slice('timer_'.length), me.name)
 }
 
 // --- validation ---
@@ -190,6 +287,7 @@ export function attachRooms(server) {
           doc: room.doc,
           users: [...room.clients.values()],
           canvas: { width: CANVAS_W, height: CANVAS_H },
+          timer: timerView(room.timer),
         })
         broadcast(room, { type: 'user_joined', user: me }, ws)
         return
@@ -201,6 +299,11 @@ export function attachRooms(server) {
         me.frameId = isId(msg.frameId) ? msg.frameId : null
         const cursor = isNum(msg.x) && isNum(msg.y) ? { x: msg.x, y: msg.y } : null
         broadcast(room, { type: 'presence', cid: me.cid, frameId: me.frameId, cursor }, ws)
+        return
+      }
+
+      if (typeof msg.type === 'string' && msg.type.startsWith('timer_')) {
+        handleTimer(room, msg, me)
         return
       }
 
@@ -228,10 +331,13 @@ export function attachRooms(server) {
       room.clients.delete(ws)
       broadcast(room, { type: 'user_left', cid: me.cid })
       if (room.clients.size === 0) {
+        // Nobody is left to watch it: pause, so a dropped connection can pick it up again.
+        if (room.timer?.endsAt != null) handleTimer(room, { type: 'timer_pause' }, me)
         save(room)
         const r = room
         r.unloadTimer = setTimeout(() => {
           if (r.clients.size === 0) {
+            stopTimer(r)
             save(r)
             rooms.delete(r.id)
           }
