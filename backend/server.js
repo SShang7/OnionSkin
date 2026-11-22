@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { handleApi } from './api.js'
 import { attachRooms, saveAllRooms } from './rooms.js'
+import { startPromptScheduler } from './promptgen.js'
 
 const PORT = Number(process.env.PORT) || 3001
 const DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../frontend/dist')
@@ -39,6 +40,7 @@ const server = http.createServer(async (req, res) => {
 })
 
 attachRooms(server)
+startPromptScheduler()
 
 // Write any unsaved drawing to disk before exiting.
 for (const signal of ['SIGINT', 'SIGTERM']) {

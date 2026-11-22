@@ -1,5 +1,6 @@
 import Logo from './Logo.jsx'
 import AuthForm from './AuthForm.jsx'
+import DailyPrompt from './DailyPrompt.jsx'
 
 /** Landing page for signed-out visitors. */
 export default function Welcome({ onSignedIn }) {
@@ -13,6 +14,7 @@ export default function Welcome({ onSignedIn }) {
             <p>Draw frame-by-frame animation together, live.</p>
           </div>
         </div>
+        <DailyPrompt signedIn={false} />
         <AuthForm onSignedIn={onSignedIn} />
         <p className="card-hint">Got an invite link? Open it to join a project, with or without an account.</p>
       </div>

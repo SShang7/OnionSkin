@@ -4,6 +4,8 @@ A collaborative whiteboard for frame-by-frame animation. Everyone in a project d
 
 Create an account to save projects. Each project has an invite link. Anyone with the link can draw, either signed in or as a guest with just a name. Signed-in visitors see the project under **Shared with you**. Only the owner can rename or delete a project.
 
+Every day there's a new **daily prompt**, the same for everyone, such as "A flower blooming" or "A walk cycle". It shows on the home page. Signed in, **Start drawing** opens that day's project; opening it again later the same day returns to it. Each day you draw something in your daily project adds to your streak, and the last 7 days are shown as dots. The day changes at your local midnight.
+
 ## Run it
 
 ```powershell
@@ -27,6 +29,27 @@ The server at http://localhost:3001 serves the built app, the API, and the WebSo
 
 Data is stored in SQLite at `backend/data/onionskin.db`. Set `DATA_DIR` to store it elsewhere, and back up that folder to keep your projects. Serve the app over HTTPS in production so session cookies are sent securely. If a proxy handles HTTPS, make sure it sets `X-Forwarded-Proto`.
 
+### AI daily prompts
+
+With an Anthropic API key, the server has Claude write new daily prompts so they don't repeat. Without one, it uses the built-in list of about 120 prompts, which repeats every few months.
+
+```powershell
+$env:ANTHROPIC_API_KEY = "sk-ant-..."
+npm run dev
+```
+
+The server keeps prompts ready for the next 30 days. When a date in the next two weeks has no prompt, it asks Claude for a new batch, roughly once every couple of weeks. Each batch is told to avoid the last year's prompts and the built-in list. If a request fails, the server tries again in 30 minutes, and any date still without a prompt gets one from the built-in list. Once a date has been shown, its prompt never changes.
+
+Review or replace upcoming prompts. Stop the server first for `generate` and `regenerate`:
+
+```powershell
+npm run prompts -w backend                    # list the next 30 days
+npm run prompts -w backend -- generate        # fill empty dates now
+npm run prompts -w backend -- regenerate      # replace prompts from the day after tomorrow on
+```
+
+Set `DAILY_PROMPTS_AI=off` to turn this off, or `DAILY_PROMPTS_MODEL` to use a different model. The default is `claude-opus-5-5`.
+
 ## Shortcuts
 
 | Key | Action |
@@ -47,7 +70,9 @@ Drag thumbnails in the timeline to reorder frames.
   - `api.js`: JSON endpoints for accounts and projects.
   - `auth.js`: scrypt password hashes, 30-day HttpOnly session cookies, and limits on repeated login attempts.
   - `rooms.js`: live editing over WebSocket (`ws`). An open project is kept in memory, saved to the database at most every 2 seconds while people draw, and saved again when the last person leaves.
-  - `db.js`: the SQLite schema and queries, using Node's built-in `node:sqlite`.
+  - `db.js`: the SQLite schema and queries, using Node's built-in `node:sqlite`. Older databases get new columns added on startup.
+  - `daily.js`: the prompt for each date (a stored AI prompt, or the built-in list as a fallback) and streak counting.
+  - `promptgen.js`: asks Claude for new batches of prompts and stores them ahead of time. `prompts-cli.js` is the review script.
 - `shared/ops.js`: the document model and the operations that change it (`stroke_start`, `stroke_points`, `stroke_remove`, `frame_add`, `frame_delete`, `frame_move`, `frame_clear`). Both server and client apply operations with the same code.
 - Strokes are applied locally first and relayed to everyone else, so drawing feels instant. Frame operations go through the server first and are echoed to everyone, so every client sees the same frame order.
 - `frontend/`: a React and Vite app.

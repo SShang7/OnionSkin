@@ -3,6 +3,7 @@ import { WebSocketServer } from 'ws'
 import { applyOp, STROKE_OPS, FRAME_OPS, CANVAS_W, CANVAS_H } from '../shared/ops.js'
 import { projects } from './db.js'
 import { userFromRequest } from './auth.js'
+import { dailyInfo } from './daily.js'
 
 const SAVE_DELAY_MS = 2000 // save at most every 2 s while people are drawing
 const UNLOAD_AFTER_MS = 5 * 60 * 1000 // drop empty rooms from memory after 5 min
@@ -185,7 +186,7 @@ export function attachRooms(server) {
         send(ws, {
           type: 'init',
           me,
-          project: { id: project.id, title: project.title, ownerName: project.owner_name, isOwner: account?.id === project.owner_id },
+          project: { id: project.id, title: project.title, ownerName: project.owner_name, isOwner: account?.id === project.owner_id, daily: dailyInfo(project) },
           doc: room.doc,
           users: [...room.clients.values()],
           canvas: { width: CANVAS_W, height: CANVAS_H },

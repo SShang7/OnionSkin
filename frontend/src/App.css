@@ -282,6 +282,166 @@
   margin: 0;
 }
 
+/* ---------- daily prompt ---------- */
+.daily-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 28px;
+  margin-bottom: 32px;
+  padding: 20px 22px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--accent-soft), transparent 70%), var(--panel);
+}
+.daily-card.is-compact {
+  margin: 0;
+  padding: 14px 16px;
+}
+.daily-text {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.daily-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.daily-prompt {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.is-compact .daily-prompt {
+  font-size: 19px;
+}
+.daily-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.daily-side {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+.daily-week {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.daily-week li {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+}
+.daily-dot {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--accent-contrast);
+}
+.daily-week .is-done .daily-dot {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.daily-week .is-today .daily-dot {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent);
+}
+.daily-day {
+  color: var(--muted);
+  font-size: 11px;
+}
+.daily-streak {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.daily-streak.is-active {
+  color: var(--text);
+}
+.daily-streak.is-active svg {
+  color: #f76707;
+}
+.daily-button {
+  gap: 6px;
+}
+.daily-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 11px;
+  font-weight: 700;
+}
+.project-thumb {
+  position: relative;
+}
+.prompt-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 420px;
+  margin-left: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+.prompt-pill > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prompt-pill svg {
+  flex: none;
+}
+@media (max-width: 1000px) {
+  .prompt-pill-label {
+    display: none;
+  }
+}
+@media (max-width: 720px) {
+  .prompt-pill {
+    display: none;
+  }
+  .daily-card {
+    padding: 16px;
+  }
+  .daily-prompt {
+    font-size: 21px;
+  }
+}
+
 /* ---------- forms ---------- */
 .field {
   display: grid;

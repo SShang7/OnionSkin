@@ -3,6 +3,7 @@ import { createFrame } from '../shared/ops.js'
 import { projects } from './db.js'
 import { signUp, logIn, startSession, endSession, userFromRequest, tooManyAttempts, recordFailedAttempt } from './auth.js'
 import { closeRoom, notifyRenamed } from './rooms.js'
+import { promptFor, validDate, streakFrom, addDays, dailyInfo } from './daily.js'
 
 const ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no 0/O or 1/I lookalikes
 const DEFAULT_TITLE = 'Untitled animation'
@@ -12,6 +13,26 @@ function newProjectId() {
   let id = ''
   for (let i = 0; i < 10; i++) id += ID_ALPHABET[randomInt(ID_ALPHABET.length)]
   return id
+}
+
+function newDoc() {
+  return { frames: [createFrame(randomUUID())] }
+}
+
+/** Today's prompt, plus your project and streak for it when signed in. */
+function dailyState(user, date) {
+  const state = { date, prompt: promptFor(date), project: null, streak: 0, week: [] }
+  if (!user) return state
+  const project = projects.daily(user.id, date)
+  const done = projects.drawnDailyDates(user.id)
+  const doneSet = new Set(done)
+  state.project = project ? { id: project.id, title: project.title, drawn: !!project.drawn } : null
+  state.streak = streakFrom(done, date)
+  state.week = Array.from({ length: 7 }, (_, i) => {
+    const day = addDays(date, i - 6)
+    return { date: day, done: doneSet.has(day) }
+  })
+  return state
 }
 
 const cleanTitle = (v) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, 60) : '')
@@ -88,6 +109,26 @@ export async function handleApi(req, res) {
       return json(res, 200, { ok: true })
     }
 
+    // --- daily prompt ---
+    if (pathname === '/api/daily') {
+      const date = method === 'GET' ? new URL(req.url, 'http://x').searchParams.get('date') : (await readJson(req)).date
+      if (!validDate(date)) return json(res, 400, { error: 'Send your local date as YYYY-MM-DD' })
+      if (method === 'GET') return json(res, 200, dailyState(user, date))
+      if (method === 'POST') {
+        if (!user) return json(res, 401, { error: 'Sign in to start the daily prompt' })
+        // One daily project per person per day: open the existing one if there is one.
+        if (!projects.daily(user.id, date)) {
+          const prompt = promptFor(date)
+          try {
+            projects.create(newProjectId(), user.id, prompt, newDoc(), { date, prompt })
+          } catch (err) {
+            if (!projects.daily(user.id, date)) throw err // otherwise a double-click raced us; fine
+          }
+        }
+        return json(res, 200, dailyState(user, date))
+      }
+    }
+
     // --- projects ---
     if (pathname === '/api/projects') {
       if (!user) return json(res, 401, { error: 'Sign in to see your projects' })
@@ -95,7 +136,7 @@ export async function handleApi(req, res) {
       if (method === 'POST') {
         const { title } = await readJson(req)
         const id = newProjectId()
-        projects.create(id, user.id, cleanTitle(title) || DEFAULT_TITLE, { frames: [createFrame(randomUUID())] })
+        projects.create(id, user.id, cleanTitle(title) || DEFAULT_TITLE, newDoc())
         return json(res, 201, { project: projects.get(id) })
       }
     }
@@ -108,7 +149,7 @@ export async function handleApi(req, res) {
 
       // Anyone with the link can see the title and join; only the owner can change it.
       if (method === 'GET') {
-        return json(res, 200, { project: { id, title: project.title, ownerName: project.owner_name, isOwner: user?.id === project.owner_id } })
+        return json(res, 200, { project: { id, title: project.title, ownerName: project.owner_name, isOwner: user?.id === project.owner_id, daily: dailyInfo(project) } })
       }
       if (!user) return json(res, 401, { error: 'Sign in first' })
 

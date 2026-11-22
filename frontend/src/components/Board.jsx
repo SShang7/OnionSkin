@@ -8,6 +8,7 @@ import Icon from './Icon.jsx'
 import Logo from './Logo.jsx'
 import HexInput from './HexInput.jsx'
 import ProjectTitle from './ProjectTitle.jsx'
+import { formatDay } from '../lib/daily.js'
 
 const SWATCHES = ['#111111', '#e03131', '#f08c00', '#2f9e44', '#1971c2', '#7048e8', '#d6336c', '#868e96']
 const THUMBNAIL_DELAY_MS = 3000
@@ -264,6 +265,16 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
             {!project.isOwner && <span className="owner-note"> · by {project.ownerName}</span>}
           </span>
         </div>
+        {project.daily && (
+          <div className="prompt-pill" title={`Daily prompt for ${formatDay(project.daily.date)}`}>
+            <Icon name="sparkle" size={14} />
+            <span>
+              <span className="prompt-pill-label">Daily prompt · </span>
+              {/* The title starts out as the prompt; once renamed, show the prompt here instead. */}
+              {project.title === project.daily.prompt ? formatDay(project.daily.date, { month: 'short', day: 'numeric' }) : project.daily.prompt}
+            </span>
+          </div>
+        )}
         <div className="spacer" />
         <ul className="avatars" aria-label="People in this project">
           {users.map((u) => (

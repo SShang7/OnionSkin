@@ -22,4 +22,9 @@ export const api = {
   renameProject: (id, title) => request('PATCH', `/projects/${id}`, { title }).then((d) => d.project),
   /** Deletes your own project, or removes someone else's from your list. */
   deleteProject: (id) => request('DELETE', `/projects/${id}`),
+
+  /** Today's prompt (and, when signed in, your project and streak for it). */
+  daily: (date) => request('GET', `/daily?date=${date}`),
+  /** Creates today's daily project, or returns the one you already started. */
+  startDaily: (date) => request('POST', '/daily', { date }),
 }

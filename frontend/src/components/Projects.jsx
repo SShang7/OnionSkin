@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api.js'
 import Logo from './Logo.jsx'
 import Icon from './Icon.jsx'
+import DailyPrompt from './DailyPrompt.jsx'
+import { formatDay } from '../lib/daily.js'
 
 const timeFormat = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
 
@@ -19,7 +21,14 @@ function ProjectCard({ project, onOpen, onRename, onDelete }) {
   return (
     <li className="project-card">
       <button className="project-open" onClick={() => onOpen(project.id)}>
-        <div className="project-thumb">{project.thumbnail ? <img src={project.thumbnail} alt="" /> : null}</div>
+        <div className="project-thumb">
+          {project.thumbnail ? <img src={project.thumbnail} alt="" /> : null}
+          {project.daily_date && (
+            <span className="daily-badge">
+              <Icon name="sparkle" size={12} /> Daily · {formatDay(project.daily_date, { month: 'short', day: 'numeric' })}
+            </span>
+          )}
+        </div>
         <div className="project-meta">
           <strong>{project.title}</strong>
           <span>
@@ -107,6 +116,8 @@ export default function Projects({ account, onOpen, onSignOut }) {
       </header>
 
       <main className="projects-main">
+        <DailyPrompt signedIn onOpen={onOpen} />
+
         <div className="projects-heading">
           <h1>Your projects</h1>
           <button className="btn btn-primary" onClick={create} disabled={creating}>
