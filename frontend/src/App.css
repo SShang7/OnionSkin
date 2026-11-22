@@ -839,8 +839,8 @@
 .sliders label {
   display: grid;
   justify-items: center;
-  gap: 2px;
-  width: 24px;
+  gap: 4px;
+  width: 26px;
 }
 .size input[type='range'] {
   writing-mode: vertical-lr;
@@ -850,10 +850,21 @@
   margin: 0;
   accent-color: var(--accent);
 }
+/* Fixed-size box, so the toolbar doesn't shift as the number changes. */
 .slider-value {
+  box-sizing: border-box;
+  width: 26px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-2);
   font-size: 9px;
+  line-height: 1;
   color: var(--muted);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- stage ---------- */
@@ -1059,6 +1070,11 @@
   .sliders label {
     width: auto;
     grid-auto-flow: column;
+  }
+  .slider-value {
+    width: 32px;
+    height: 20px;
+    font-size: 10px;
   }
   .size input[type='range'] {
     writing-mode: horizontal-tb;
