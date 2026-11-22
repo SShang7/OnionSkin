@@ -20,11 +20,12 @@ function getClientId() {
 }
 
 /**
- * Connects to a room and keeps a local copy of the shared animation.
- * The doc lives in a ref (it changes on every pointer move); `version`
- * increments at most once per animation frame to re-render React.
+ * Connects to a project and keeps a local copy of the shared animation.
+ * The doc lives in a stable store (it changes on every pointer move);
+ * `version` increments at most once per animation frame to re-render React.
+ * `guestName` is only used when not signed in.
  */
-export function useRoom(room, name) {
+export function useRoom(projectId, guestName) {
   // A stable, mutable store: strokes change on every pointer move, so React
   // only re-renders via `version`, not by copying the document.
   const [store] = useState(() => ({ doc: { frames: [] } }))
@@ -34,7 +35,11 @@ export function useRoom(room, name) {
   const [status, setStatus] = useState('connecting')
   const [me, setMe] = useState(null)
   const [users, setUsers] = useState([])
-  const [presence, setPresence] = useState({}) // userId -> { frameId, cursor }
+  const [presence, setPresence] = useState({}) // connection id -> { frameId, cursor }
+  const [project, setProject] = useState(null)
+  const [fatal, setFatal] = useState(null) // { code, message } — stop reconnecting
+  const [savedAt, setSavedAt] = useState(null)
+  const [unsaved, setUnsaved] = useState(false)
 
   const scheduled = useRef(false)
   const changed = useCallback(() => {
@@ -48,6 +53,7 @@ export function useRoom(room, name) {
 
   useEffect(() => {
     let disposed = false
+    let gaveUp = false // the server said this project can't be joined
     let retryTimer
     let attempts = 0
 
@@ -59,7 +65,7 @@ export function useRoom(room, name) {
 
       ws.onopen = () => {
         attempts = 0
-        ws.send(JSON.stringify({ type: 'join', room, name, clientId: getClientId() }))
+        ws.send(JSON.stringify({ type: 'join', projectId, name: guestName, clientId: getClientId() }))
       }
 
       ws.onmessage = (event) => {
@@ -68,42 +74,58 @@ export function useRoom(room, name) {
           case 'init':
             store.doc = msg.doc
             setMe(msg.me)
+            setProject(msg.project)
             setUsers(msg.users)
-            setPresence(Object.fromEntries(msg.users.map((u) => [u.id, { frameId: u.frameId, cursor: null }])))
+            setPresence(Object.fromEntries(msg.users.map((u) => [u.cid, { frameId: u.frameId, cursor: null }])))
             setStatus('connected')
             break
           case 'resync':
             store.doc = msg.doc
             break
           case 'user_joined':
-            setUsers((list) => [...list.filter((u) => u.id !== msg.user.id), msg.user])
+            setUsers((list) => [...list.filter((u) => u.cid !== msg.user.cid), msg.user])
             break
           case 'user_left':
-            setUsers((list) => list.filter((u) => u.id !== msg.id))
+            setUsers((list) => list.filter((u) => u.cid !== msg.cid))
             setPresence((p) => {
               const next = { ...p }
-              delete next[msg.id]
+              delete next[msg.cid]
               return next
             })
             break
           case 'presence':
-            setPresence((p) => ({ ...p, [msg.id]: { frameId: msg.frameId, cursor: msg.cursor } }))
+            setPresence((p) => ({ ...p, [msg.cid]: { frameId: msg.frameId, cursor: msg.cursor } }))
+            break
+          case 'saved':
+            setSavedAt(msg.at)
+            setUnsaved(false)
+            break
+          case 'title':
+            setProject((p) => p && { ...p, title: msg.title })
+            break
+          case 'deleted':
+            gaveUp = true
+            setFatal({ code: 'deleted', message: 'The owner deleted this project.' })
             break
           case 'error':
-            console.error('Server error:', msg.message)
+            if (msg.code) {
+              gaveUp = true
+              setFatal({ code: msg.code, message: msg.message })
+            } else console.error('Server error:', msg.message)
             break
           default:
             if (STROKE_OPS.has(msg.type) || FRAME_OPS.has(msg.type)) {
               // Listeners see the document as it was just before this op.
               for (const fn of listenersRef.current) fn(msg, store.doc)
               applyOp(store.doc, msg)
+              setUnsaved(true)
             }
         }
         changed()
       }
 
       ws.onclose = () => {
-        if (disposed) return
+        if (disposed || gaveUp) return
         setStatus('disconnected')
         const delay = Math.min(5000, 500 * 2 ** attempts++)
         retryTimer = setTimeout(connect, delay)
@@ -116,7 +138,7 @@ export function useRoom(room, name) {
       clearTimeout(retryTimer)
       wsRef.current?.close()
     }
-  }, [room, name, changed, store])
+  }, [projectId, guestName, changed, store])
 
   const send = useCallback((msg) => {
     const ws = wsRef.current
@@ -128,6 +150,7 @@ export function useRoom(room, name) {
     (op) => {
       if (applyOp(store.doc, op)) {
         send(op)
+        setUnsaved(true)
         changed()
       }
     },
@@ -143,5 +166,22 @@ export function useRoom(room, name) {
     return () => listenersRef.current.delete(fn)
   }, [])
 
-  return { doc: store.doc, store, version, status, me, users, presence, strokeOp, frameOp, send, onOp, changed }
+  return {
+    doc: store.doc,
+    version,
+    status,
+    me,
+    users,
+    presence,
+    project,
+    setProject,
+    fatal,
+    savedAt,
+    unsaved,
+    strokeOp,
+    frameOp,
+    send,
+    onOp,
+    changed,
+  }
 }

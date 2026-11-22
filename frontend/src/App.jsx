@@ -1,46 +1,63 @@
-import { useState } from 'react'
-import Lobby from './components/Lobby.jsx'
+import { useEffect, useState } from 'react'
+import { api } from './lib/api.js'
+import Welcome from './components/Welcome.jsx'
+import Projects from './components/Projects.jsx'
+import GuestJoin from './components/GuestJoin.jsx'
 import Board from './components/Board.jsx'
+import Logo from './components/Logo.jsx'
 import './App.css'
 
-const NAME_KEY = 'onionskin.name'
-
-function readName() {
-  try {
-    return localStorage.getItem(NAME_KEY) ?? ''
-  } catch {
-    return ''
-  }
-}
-
-function setRoomInUrl(room) {
-  const url = new URL(location.href)
-  if (room) url.searchParams.set('room', room)
-  else url.searchParams.delete('room')
-  history.replaceState(null, '', url)
+/** The only route is ?project=ID; everything else is the home page. */
+function projectFromUrl() {
+  return new URLSearchParams(location.search).get('project')?.toUpperCase() || null
 }
 
 export default function App() {
-  const urlRoom = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? ''
-  const savedName = readName()
-  // An invite link plus a remembered name drops you straight into the room.
-  const [session, setSession] = useState(() => (urlRoom && savedName ? { room: urlRoom, name: savedName } : null))
+  const [account, setAccount] = useState(undefined) // undefined = still checking, null = signed out
+  const [projectId, setProjectId] = useState(projectFromUrl)
+  const [guestName, setGuestName] = useState(null)
 
-  function join(room, name) {
-    try {
-      localStorage.setItem(NAME_KEY, name)
-    } catch {
-      /* private mode */
+  useEffect(() => {
+    api.me().then(setAccount, () => setAccount(null))
+    const onPop = () => setProjectId(projectFromUrl())
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  function open(id) {
+    history.pushState(null, '', id ? `/?project=${id}` : '/')
+    setProjectId(id)
+  }
+
+  async function signOut() {
+    await api.logOut().catch(() => {})
+    setAccount(null)
+    setGuestName(null)
+  }
+
+  if (account === undefined) {
+    return (
+      <div className="loading">
+        <Logo size={40} />
+      </div>
+    )
+  }
+
+  if (projectId) {
+    if (account || guestName) {
+      return (
+        <Board
+          key={`${projectId}:${account?.id ?? guestName}`}
+          projectId={projectId}
+          guestName={account ? null : guestName}
+          signedIn={!!account}
+          onExit={() => open(null)}
+        />
+      )
     }
-    setRoomInUrl(room)
-    setSession({ room, name })
+    return <GuestJoin projectId={projectId} onGuest={setGuestName} onSignedIn={setAccount} onCancel={() => open(null)} />
   }
 
-  function leave() {
-    setRoomInUrl(null)
-    setSession(null)
-  }
-
-  if (!session) return <Lobby initialRoom={urlRoom} initialName={savedName} onJoin={join} />
-  return <Board key={session.room} room={session.room} name={session.name} onLeave={leave} />
+  if (!account) return <Welcome onSignedIn={setAccount} />
+  return <Projects account={account} onOpen={open} onSignOut={signOut} />
 }

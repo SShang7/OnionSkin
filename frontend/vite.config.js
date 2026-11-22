@@ -9,6 +9,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/ws': { target: 'ws://localhost:3001', ws: true },
+      '/api': { target: 'http://localhost:3001' },
     },
     fs: {
       // Allow importing ../shared/ops.js

@@ -116,7 +116,7 @@ export default function Stage({ frame, prevFrame, nextFrame, onion, version, too
         />
         {cursors.map(({ user, cursor }) => (
           <div
-            key={user.id}
+            key={user.cid}
             className="remote-cursor"
             style={{ left: `${(cursor.x / CANVAS_W) * 100}%`, top: `${(cursor.y / CANVAS_H) * 100}%`, '--c': user.color }}
           >

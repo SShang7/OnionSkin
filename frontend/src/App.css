@@ -23,7 +23,7 @@
 .btn:focus-visible,
 .swatch:focus-visible,
 .frame-button:focus-visible,
-.room-chip:focus-visible {
+.project-title.is-editable:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -63,21 +63,23 @@
   flex: 1;
 }
 
-/* ---------- lobby ---------- */
-.lobby,
+/* ---------- full-page cards (welcome, invite) ---------- */
+.centered-page,
 .loading {
   height: 100%;
   display: grid;
   place-items: center;
   padding: 16px;
+  overflow-y: auto;
 }
 .loading {
   align-content: center;
   gap: 12px;
   color: var(--muted);
   justify-items: center;
+  text-align: center;
 }
-.lobby-card {
+.card {
   width: min(420px, 100%);
   display: grid;
   gap: 18px;
@@ -87,25 +89,200 @@
   border-radius: 16px;
   box-shadow: var(--shadow);
 }
-.lobby-brand {
+.card-brand {
   display: flex;
   gap: 14px;
   align-items: center;
 }
-.lobby-brand h1 {
+.card-brand h1 {
   margin: 0;
   font-size: 24px;
   letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
 }
-.lobby-brand p,
-.lobby-hint {
+.card-brand p,
+.card-hint,
+.muted {
   margin: 0;
   color: var(--muted);
 }
-.lobby-hint {
+.card-hint {
   font-size: 13px;
   text-align: center;
 }
+.eyebrow {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.auth-form,
+.guest-form {
+  display: grid;
+  gap: 14px;
+}
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+.segmented button {
+  height: 32px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+.segmented button.is-on {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.field-hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+.form-error {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(224, 49, 49, 0.1);
+  color: var(--danger);
+  font-size: 13px;
+}
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ---------- projects page ---------- */
+.projects-page {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+.projects-main {
+  overflow-y: auto;
+  padding: 28px max(16px, calc((100% - 1100px) / 2)) 48px;
+}
+.projects-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.projects-main h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+.projects-main h2 {
+  margin: 36px 0 14px;
+  font-size: 16px;
+}
+.account-name {
+  font-weight: 600;
+}
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.project-card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  overflow: hidden;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.project-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow);
+}
+.project-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.project-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.project-thumb {
+  aspect-ratio: 16 / 9;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+.project-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.project-meta {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px 12px;
+  padding-right: 84px;
+}
+.project-meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-meta span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.project-actions {
+  position: absolute;
+  right: 6px;
+  bottom: 8px;
+  display: flex;
+}
+.project-actions .btn-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--muted);
+}
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 48px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+.empty-state p {
+  margin: 0;
+}
+
+/* ---------- forms ---------- */
 .field {
   display: grid;
   gap: 6px;
@@ -155,22 +332,49 @@
   font-weight: 700;
   letter-spacing: -0.01em;
 }
-.room-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 10px;
-  border: 1px dashed var(--border);
-  border-radius: 999px;
-  background: var(--panel-2);
-  cursor: pointer;
-  font-weight: 600;
-}
-.room-chip-label {
+.back-button {
+  gap: 4px;
+  padding: 0 8px;
   color: var(--muted);
-  font-weight: 400;
-  font-size: 12px;
+}
+.title-block {
+  display: grid;
+  min-width: 0;
+  line-height: 1.2;
+}
+.project-title,
+.project-title-input {
+  margin: 0;
+  max-width: min(420px, 50vw);
+  font-size: 15px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-title.is-editable {
+  padding: 2px 6px;
+  margin-left: -6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+  cursor: text;
+}
+.project-title.is-editable:hover {
+  border-color: var(--border);
+}
+.project-title-input {
+  width: min(420px, 50vw);
+  padding: 2px 6px;
+  margin-left: -6px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel-2);
+  outline: none;
+}
+.invite-button {
+  height: 32px;
 }
 .status {
   display: inline-flex;
@@ -210,6 +414,9 @@
   color: #fff;
   font-weight: 700;
   font-size: 13px;
+}
+.avatars li.is-guest {
+  border-style: dashed;
 }
 
 .workspace {
@@ -477,9 +684,14 @@
 /* ---------- small screens ---------- */
 @media (max-width: 720px) {
   .brand span,
-  .room-chip-label,
+  .owner-note,
+  .invite-button span,
   .btn .label {
     display: none;
+  }
+  .invite-button {
+    width: 36px;
+    padding: 0;
   }
   .workspace {
     grid-template-columns: 1fr;

@@ -89,7 +89,7 @@ export default function Timeline({
               <span className="frame-number mono">{i + 1}</span>
               <span className="frame-users">
                 {(usersByFrame[frame.id] ?? []).map((u) => (
-                  <span key={u.id} className="dot" style={{ background: u.color }} title={u.name} />
+                  <span key={u.cid} className="dot" style={{ background: u.color }} title={u.name} />
                 ))}
               </span>
             </button>

@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRoom, uid } from '../lib/useRoom.js'
+import { api } from '../lib/api.js'
+import { renderThumbnail } from '../lib/render.js'
 import Stage from './Stage.jsx'
 import Timeline from './Timeline.jsx'
 import Icon from './Icon.jsx'
 import Logo from './Logo.jsx'
 import HexInput from './HexInput.jsx'
+import ProjectTitle from './ProjectTitle.jsx'
 
 const SWATCHES = ['#111111', '#e03131', '#f08c00', '#2f9e44', '#1971c2', '#7048e8', '#d6336c', '#868e96']
+const THUMBNAIL_DELAY_MS = 3000
 
-export default function Board({ room, name, onLeave }) {
-  const { doc, version, status, me, users, presence, strokeOp, frameOp, send, onOp } = useRoom(room, name)
+export default function Board({ projectId, guestName, signedIn, onExit }) {
+  const { doc, version, status, me, users, presence, project, setProject, fatal, savedAt, unsaved, strokeOp, frameOp, send, onOp } =
+    useRoom(projectId, guestName)
   const frames = doc.frames
 
   const [currentId, setCurrentId] = useState(null)
@@ -123,9 +128,42 @@ export default function Board({ room, name, onLeave }) {
     setPlaying(!playing)
   }
 
+  const rename = async (title) => {
+    const previous = project.title
+    setProject((p) => ({ ...p, title }))
+    try {
+      await api.renameProject(projectId, title)
+    } catch (err) {
+      setProject((p) => ({ ...p, title: previous }))
+      alert(err.message)
+    }
+  }
+
+  // Keep the project's cover image (frame 1) up to date for the projects page.
+  const firstFrame = frames[0]
+  const thumbKeyRef = useRef(null)
+  useEffect(() => {
+    if (!firstFrame || status !== 'connected') return
+    const key = `${firstFrame.id}:${firstFrame.rev}`
+    if (thumbKeyRef.current === null) {
+      thumbKeyRef.current = key // what we loaded is already the saved cover
+      return
+    }
+    if (thumbKeyRef.current === key) return
+    const t = setTimeout(() => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 320
+      canvas.height = 180
+      renderThumbnail(canvas, firstFrame)
+      send({ type: 'thumbnail', dataUrl: canvas.toDataURL('image/jpeg', 0.75) })
+      thumbKeyRef.current = key
+    }, THUMBNAIL_DELAY_MS)
+    return () => clearTimeout(t)
+  }, [firstFrame, firstFrame?.rev, version, status, send])
+
   const copyInvite = async () => {
-    const url = new URL(location.href)
-    url.searchParams.set('room', room)
+    const url = new URL(location.origin)
+    url.searchParams.set('project', projectId)
     try {
       await navigator.clipboard.writeText(url.toString())
       setCopied(true)
@@ -167,60 +205,81 @@ export default function Board({ room, name, onLeave }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // --- presence ---
-  const usersById = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
+  // --- presence (keyed by connection, so one account in two tabs shows twice) ---
+  const usersByCid = useMemo(() => Object.fromEntries(users.map((u) => [u.cid, u])), [users])
   const usersByFrame = useMemo(() => {
     const map = {}
-    for (const [id, p] of Object.entries(presence)) {
-      const user = usersById[id]
-      if (!user || !p.frameId) continue
+    for (const [cid, p] of Object.entries(presence)) {
+      const user = usersByCid[cid]
+      if (!user || !p.frameId || cid === me?.cid) continue
       ;(map[p.frameId] ??= []).push(user)
     }
     if (me && currentFrameId) (map[currentFrameId] ??= []).unshift(me)
     return map
-  }, [presence, usersById, me, currentFrameId])
+  }, [presence, usersByCid, me, currentFrameId])
 
   const cursors = Object.entries(presence)
-    .filter(([id, p]) => p.cursor && p.frameId === shown?.id && usersById[id] && id !== me?.id)
-    .map(([id, p]) => ({ user: usersById[id], cursor: p.cursor }))
+    .filter(([cid, p]) => p.cursor && p.frameId === shown?.id && usersByCid[cid] && cid !== me?.cid)
+    .map(([cid, p]) => ({ user: usersByCid[cid], cursor: p.cursor }))
 
-  if (!me) {
+  const exitLabel = signedIn ? 'Projects' : 'Home'
+
+  if (fatal) {
     return (
       <div className="loading">
         <Logo size={40} />
-        <p>{status === 'disconnected' ? 'Can’t reach the server — retrying…' : `Joining room ${room}…`}</p>
-        <button className="btn" onClick={onLeave}>
-          Back to lobby
+        <p>{fatal.message}</p>
+        <button className="btn btn-primary" onClick={onExit}>
+          Back to {exitLabel.toLowerCase()}
         </button>
       </div>
     )
   }
 
+  if (!me) {
+    return (
+      <div className="loading">
+        <Logo size={40} />
+        <p>{status === 'disconnected' ? 'Can’t reach the server — retrying…' : 'Opening project…'}</p>
+        <button className="btn" onClick={onExit}>
+          Back to {exitLabel.toLowerCase()}
+        </button>
+      </div>
+    )
+  }
+
+  const saveLabel = status !== 'connected' ? 'Offline — changes paused' : unsaved ? 'Saving…' : savedAt ? 'Saved' : 'All changes saved'
+
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">
-          <Logo />
-          <span>OnionSkin</span>
-        </div>
-        <button className="room-chip" onClick={copyInvite} title="Copy invite link">
-          <span className="mono">{room}</span>
-          <Icon name="link" size={15} />
-          <span className="room-chip-label">{copied ? 'Copied!' : 'Invite'}</span>
+        <button className="btn btn-ghost back-button" onClick={onExit} title={`Back to ${exitLabel.toLowerCase()}`}>
+          <Icon name="prev" size={16} />
+          <Logo size={22} />
         </button>
-        <span className={`status status-${status}`} title={status}>
-          {status === 'connected' ? 'Live' : status === 'connecting' ? 'Connecting…' : 'Offline'}
-        </span>
+        <div className="title-block">
+          <ProjectTitle title={project.title} editable={project.isOwner} onRename={rename} />
+          <span className={`status status-${status}`} title={savedAt ? `Last saved ${new Date(savedAt).toLocaleTimeString()}` : undefined}>
+            {saveLabel}
+            {!project.isOwner && <span className="owner-note"> · by {project.ownerName}</span>}
+          </span>
+        </div>
         <div className="spacer" />
-        <ul className="avatars" aria-label="People in this room">
+        <ul className="avatars" aria-label="People in this project">
           {users.map((u) => (
-            <li key={u.id} style={{ '--c': u.color }} title={u.id === me.id ? `${u.name} (you)` : u.name}>
+            <li
+              key={u.cid}
+              style={{ '--c': u.color }}
+              className={u.guest ? 'is-guest' : undefined}
+              title={`${u.name}${u.guest ? ' (guest)' : ''}${u.cid === me.cid ? ' — you' : ''}`}
+            >
               {u.name.slice(0, 1).toUpperCase()}
             </li>
           ))}
         </ul>
-        <button className="btn btn-icon btn-ghost" onClick={onLeave} title="Leave room">
-          <Icon name="exit" />
+        <button className="btn btn-primary invite-button" onClick={copyInvite} title="Copy a link anyone can use to join">
+          <Icon name="link" size={15} />
+          <span>{copied ? 'Link copied!' : 'Invite'}</span>
         </button>
       </header>
 
