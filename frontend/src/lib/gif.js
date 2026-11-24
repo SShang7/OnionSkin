@@ -12,7 +12,7 @@ const nextTick = () => new Promise((resolve) => setTimeout(resolve))
  *
  * @returns {Promise<Blob>}
  */
-export async function encodeGif(frames, { width, height, fps, loop = true, onProgress, signal }) {
+export async function encodeGif(frames, { layerIds, width, height, fps, loop = true, onProgress, signal }) {
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
@@ -21,7 +21,7 @@ export async function encodeGif(frames, { width, height, fps, loop = true, onPro
   const total = frames.length * 2 // two passes: palette, then encoding
 
   const render = (frame) => {
-    renderThumbnail(canvas, frame)
+    renderThumbnail(canvas, frame, layerIds)
     return ctx.getImageData(0, 0, width, height).data
   }
 

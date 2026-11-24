@@ -580,9 +580,128 @@
 }
 
 .workspace {
+  position: relative;
   min-height: 0;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr auto;
+}
+
+/* ---------- layers panel ---------- */
+.layers-panel {
+  width: 200px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+}
+.layers-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 6px 12px;
+}
+.layers-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.layers-head .btn-icon,
+.layers-actions .btn-icon {
+  width: 30px;
+  height: 30px;
+}
+.layers-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0 6px;
+  list-style: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.layer-row {
+  display: grid;
+  grid-template-columns: 24px 48px 1fr;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  padding: 4px 6px 4px 2px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.layer-row:hover {
+  background: var(--panel-2);
+}
+.layer-row.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.layer-row.is-drop-target {
+  box-shadow: 0 -3px 0 var(--accent);
+}
+.layer-row.is-hidden .layer-thumb,
+.layer-row.is-hidden .layer-name {
+  opacity: 0.45;
+}
+.layer-eye {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.layer-eye:hover {
+  color: var(--text);
+  background: var(--panel);
+}
+.layer-eye:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.layer-thumb {
+  width: 48px;
+  height: 27px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--border);
+  background: #fff;
+}
+.layer-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.layer-name-input {
+  min-width: 0;
+  width: 100%;
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+.layers-note {
+  margin: 0 10px 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.layers-actions {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
 }
 
 /* ---------- shared timer ---------- */
@@ -1336,6 +1455,18 @@
   .workspace {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
+  }
+  /* Floats over the canvas on small screens. */
+  .layers-panel {
+    position: absolute;
+    top: 64px;
+    right: 8px;
+    bottom: 8px;
+    z-index: 10;
+    width: 190px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
   }
   .toolbar {
     flex-direction: row;

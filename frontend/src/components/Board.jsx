@@ -10,6 +10,8 @@ import ColorPicker from './ColorPicker.jsx'
 import ProjectTitle from './ProjectTitle.jsx'
 import TimerControl from './TimerControl.jsx'
 import ExportGif from './ExportGif.jsx'
+import LayersPanel from './LayersPanel.jsx'
+import { MAX_LAYERS } from '../../../shared/ops.js'
 import { formatDay } from '../lib/daily.js'
 
 const SWATCHES = ['#111111', '#e03131', '#f08c00', '#2f9e44', '#1971c2', '#7048e8', '#d6336c', '#868e96']
@@ -19,6 +21,7 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
   const { doc, version, status, me, users, presence, project, setProject, fatal, savedAt, unsaved, timer, timerEvent, strokeOp, frameOp, send, onOp } =
     useRoom(projectId, guestName)
   const frames = doc.frames
+  const layers = doc.layers
 
   const [currentId, setCurrentId] = useState(null)
   const [tool, setTool] = useState('pen')
@@ -32,6 +35,23 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
   const [loop, setLoop] = useState(true)
   const [copied, setCopied] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [activeLayerId, setActiveLayerId] = useState(null)
+  const [hiddenLayers, setHiddenLayers] = useState(() => new Set()) // only affects my view
+  const [showLayers, setShowLayers] = useState(() => window.innerWidth > 900)
+
+  // The layer I draw on; falls back to the top layer if mine was deleted.
+  const activeLayer = layers.find((l) => l.id === activeLayerId) ?? layers.at(-1)
+  const activeLayerIndex = layers.indexOf(activeLayer)
+  const activeHidden = !!activeLayer && hiddenLayers.has(activeLayer.id)
+
+  // Stable lists of layer ids (bottom to top) for rendering: what I can see, and all of them.
+  const visibleKey = layers
+    .filter((l) => !hiddenLayers.has(l.id))
+    .map((l) => l.id)
+    .join(',')
+  const allKey = layers.map((l) => l.id).join(',')
+  const visibleLayerIds = useMemo(() => (visibleKey ? visibleKey.split(',') : []), [visibleKey])
+  const allLayerIds = useMemo(() => (allKey ? allKey.split(',') : []), [allKey])
 
   const currentIndex = Math.max(0, frames.findIndex((f) => f.id === currentId))
   const current = frames[currentIndex]
@@ -55,9 +75,15 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
     return () => clearTimeout(t)
   }, [awaitingFrame])
 
+  const pendingLayerRef = useRef(null)
   useEffect(
     () =>
       onOp((op, before) => {
+        // Switch to a layer I just added once the server confirms it.
+        if (op.type === 'layer_add' && op.layerId === pendingLayerRef.current) {
+          pendingLayerRef.current = null
+          setActiveLayerId(op.layerId)
+        }
         // Jump to frames I create once the server confirms them.
         if (op.type === 'frame_add' && op.frameId === pendingSelectRef.current) {
           pendingSelectRef.current = null
@@ -131,10 +157,46 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
   }
 
   const clearFrame = () => {
-    if (current?.strokes.length && confirm(`Clear everything on frame ${currentIndex + 1} for everyone?`)) {
+    if (!current) return
+    if (layers.length > 1) {
+      // With several layers, clear just the one I'm on.
+      if (!current.strokes.some((s) => s.layer === activeLayer.id)) return
+      if (confirm(`Clear “${activeLayer.name}” on frame ${currentIndex + 1} for everyone?`)) {
+        frameOp({ type: 'frame_clear', frameId: current.id, layerId: activeLayer.id })
+      }
+    } else if (current.strokes.length && confirm(`Clear everything on frame ${currentIndex + 1} for everyone?`)) {
       frameOp({ type: 'frame_clear', frameId: current.id })
     }
   }
+
+  // --- layers (shared with everyone; the server applies them and echoes back) ---
+  const addLayer = () => {
+    if (layers.length >= MAX_LAYERS) return
+    const numbers = layers.map((l) => Number(/^Layer (\d+)$/.exec(l.name)?.[1] ?? 0))
+    const layerId = uid()
+    pendingLayerRef.current = layerId
+    frameOp({ type: 'layer_add', layerId, name: `Layer ${Math.max(layers.length, ...numbers) + 1}`, index: activeLayerIndex + 1 })
+  }
+
+  const deleteLayer = (layer) => {
+    if (layers.length <= 1) return
+    const used = frames.filter((f) => f.strokes.some((s) => s.layer === layer.id)).length
+    const warning = used
+      ? `Delete “${layer.name}” and everything drawn on it in ${used} ${used === 1 ? 'frame' : 'frames'}, for everyone?`
+      : `Delete “${layer.name}”?`
+    if (!confirm(warning)) return
+    // Keep drawing on the layer below (or the new bottom one).
+    const i = layers.indexOf(layer)
+    setActiveLayerId((layers[i - 1] ?? layers[i + 1])?.id ?? null)
+    frameOp({ type: 'layer_delete', layerId: layer.id })
+  }
+
+  const toggleHidden = (id) =>
+    setHiddenLayers((set) => {
+      const next = new Set(set)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
 
   const undo = () => {
     if (!current || !me) return
@@ -165,7 +227,7 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
   const thumbKeyRef = useRef(null)
   useEffect(() => {
     if (!firstFrame || status !== 'connected') return
-    const key = `${firstFrame.id}:${firstFrame.rev}`
+    const key = `${firstFrame.id}:${firstFrame.rev}:${allLayerIds.join(',')}`
     if (thumbKeyRef.current === null) {
       thumbKeyRef.current = key // what we loaded is already the saved cover
       return
@@ -175,12 +237,12 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
       const canvas = document.createElement('canvas')
       canvas.width = 320
       canvas.height = 180
-      renderThumbnail(canvas, firstFrame)
+      renderThumbnail(canvas, firstFrame, allLayerIds)
       send({ type: 'thumbnail', dataUrl: canvas.toDataURL('image/jpeg', 0.75) })
       thumbKeyRef.current = key
     }, THUMBNAIL_DELAY_MS)
     return () => clearTimeout(t)
-  }, [firstFrame, firstFrame?.rev, version, status, send])
+  }, [firstFrame, firstFrame?.rev, allLayerIds, version, status, send])
 
   const copyInvite = async () => {
     const url = new URL(location.origin)
@@ -388,8 +450,16 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
             <button className={`btn btn-icon ${onion ? 'is-on' : ''}`} onClick={() => setOnion((v) => !v)} title="Onion skin (O)">
               <Icon name="onion" />
             </button>
-            <button className="btn btn-icon" onClick={clearFrame} title="Clear frame">
+            <button className="btn btn-icon" onClick={clearFrame} title={layers.length > 1 ? 'Clear this layer on this frame' : 'Clear frame'}>
               <Icon name="clear" />
+            </button>
+            <button
+              className={`btn btn-icon ${showLayers ? 'is-on' : ''}`}
+              onClick={() => setShowLayers((v) => !v)}
+              title={`Layers${activeLayer ? ` · drawing on ${activeLayer.name}` : ''}`}
+              aria-expanded={showLayers}
+            >
+              <Icon name="layers" />
             </button>
           </div>
         </aside>
@@ -398,22 +468,41 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
           frame={shown}
           prevFrame={!playing ? frames[shownIndex - 1] : null}
           nextFrame={!playing ? frames[shownIndex + 1] : null}
+          layerIds={visibleLayerIds}
+          layerId={activeHidden ? null : activeLayer?.id}
           onion={onion && !playing}
           version={version}
           tool={tool}
           color={color}
           size={size}
           opacity={opacity}
-          disabled={playing || awaitingFrame}
+          disabled={playing || awaitingFrame || activeHidden}
           me={me}
           strokeOp={strokeOp}
           sendPresence={sendPresence}
           cursors={cursors}
         />
+
+        {showLayers && (
+          <LayersPanel
+            layers={layers}
+            frame={current}
+            activeId={activeLayer?.id}
+            hidden={hiddenLayers}
+            maxLayers={MAX_LAYERS}
+            onSelect={setActiveLayerId}
+            onToggleHidden={toggleHidden}
+            onAdd={addLayer}
+            onDelete={deleteLayer}
+            onMove={(layerId, index) => frameOp({ type: 'layer_move', layerId, index })}
+            onRename={(layerId, name) => frameOp({ type: 'layer_rename', layerId, name })}
+          />
+        )}
       </div>
 
       <Timeline
         frames={frames}
+        layerIds={visibleLayerIds}
         currentIndex={currentIndex}
         playing={playing}
         playIndex={shownIndex}
@@ -430,7 +519,7 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
         onLoop={setLoop}
       />
 
-      {exporting && <ExportGif frames={frames} fps={fps} loop={loop} title={project.title} onClose={() => setExporting(false)} />}
+      {exporting && <ExportGif frames={frames} layerIds={visibleLayerIds} hiddenCount={layers.length - visibleLayerIds.length} fps={fps} loop={loop} title={project.title} onClose={() => setExporting(false)} />}
     </div>
   )
 }

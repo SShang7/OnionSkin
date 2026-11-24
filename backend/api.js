@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto'
-import { createFrame } from '../shared/ops.js'
+import { createDoc } from '../shared/ops.js'
 import { projects } from './db.js'
 import { signUp, logIn, startSession, endSession, userFromRequest, tooManyAttempts, recordFailedAttempt } from './auth.js'
 import { closeRoom, notifyRenamed } from './rooms.js'
@@ -16,7 +16,7 @@ function newProjectId() {
 }
 
 function newDoc() {
-  return { frames: [createFrame(randomUUID())] }
+  return createDoc(randomUUID())
 }
 
 /** Today's prompt, plus your project and streak for it when signed in. */

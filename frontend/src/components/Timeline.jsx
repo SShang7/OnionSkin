@@ -2,16 +2,17 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { renderThumbnail } from '../lib/render.js'
 import Icon from './Icon.jsx'
 
-const Thumb = memo(function Thumb({ frame, rev }) {
+const Thumb = memo(function Thumb({ frame, rev, layerIds }) {
   const ref = useRef(null)
   useEffect(() => {
-    renderThumbnail(ref.current, frame)
-  }, [frame, rev])
+    renderThumbnail(ref.current, frame, layerIds)
+  }, [frame, rev, layerIds])
   return <canvas ref={ref} width={224} height={126} className="thumb-canvas" />
 })
 
 export default function Timeline({
   frames,
+  layerIds,
   currentIndex,
   playing,
   playIndex,
@@ -91,7 +92,7 @@ export default function Timeline({
             }}
           >
             <button className="frame-button" onClick={() => onSelect(i)} aria-label={`Frame ${i + 1}`}>
-              <Thumb frame={frame} rev={frame.rev} />
+              <Thumb frame={frame} rev={frame.rev} layerIds={layerIds} />
               <span className="frame-number mono">{i + 1}</span>
               <span className="frame-users">
                 {(usersByFrame[frame.id] ?? []).map((u) => (

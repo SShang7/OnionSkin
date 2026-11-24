@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { CANVAS_W, CANVAS_H, getLayer, ONION_PREV, ONION_NEXT } from '../lib/render.js'
+import { CANVAS_W, CANVAS_H, getFrameImage, ONION_PREV, ONION_NEXT } from '../lib/render.js'
 import { uid } from '../lib/useRoom.js'
 
 const round = (n) => Math.round(n * 10) / 10
 const CURSOR_INTERVAL_MS = 40
 
-export default function Stage({ frame, prevFrame, nextFrame, onion, version, tool, color, size, opacity, disabled, me, strokeOp, sendPresence, cursors }) {
+export default function Stage({ frame, prevFrame, nextFrame, layerIds, layerId, onion, version, tool, color, size, opacity, disabled, me, strokeOp, sendPresence, cursors }) {
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
   const drawingRef = useRef(null)
@@ -33,15 +33,15 @@ export default function Stage({ frame, prevFrame, nextFrame, onion, version, too
     if (!frame) return
     if (onion && prevFrame) {
       ctx.globalAlpha = 0.3
-      ctx.drawImage(getLayer(prevFrame, ONION_PREV), 0, 0)
+      ctx.drawImage(getFrameImage(prevFrame, layerIds, ONION_PREV), 0, 0)
     }
     if (onion && nextFrame) {
       ctx.globalAlpha = 0.2
-      ctx.drawImage(getLayer(nextFrame, ONION_NEXT), 0, 0)
+      ctx.drawImage(getFrameImage(nextFrame, layerIds, ONION_NEXT), 0, 0)
     }
     ctx.globalAlpha = 1
-    ctx.drawImage(getLayer(frame), 0, 0)
-  }, [frame, prevFrame, nextFrame, onion, version])
+    ctx.drawImage(getFrameImage(frame, layerIds), 0, 0)
+  }, [frame, prevFrame, nextFrame, layerIds, onion, version])
 
   function toPoint(e) {
     const r = canvasRef.current.getBoundingClientRect()
@@ -57,7 +57,7 @@ export default function Stage({ frame, prevFrame, nextFrame, onion, version, too
   }
 
   function onPointerDown(e) {
-    if (disabled || !frame || !me) return
+    if (disabled || !frame || !me || !layerId) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
     e.currentTarget.setPointerCapture(e.pointerId)
     const [x, y] = toPoint(e)
@@ -65,7 +65,7 @@ export default function Stage({ frame, prevFrame, nextFrame, onion, version, too
     strokeOp({
       type: 'stroke_start',
       frameId: frame.id,
-      stroke: { id: strokeId, by: me.id, tool, color, size: tool === 'eraser' ? size * 3 : size, opacity, points: [x, y] },
+      stroke: { id: strokeId, by: me.id, layer: layerId, tool, color, size: tool === 'eraser' ? size * 3 : size, opacity, points: [x, y] },
     })
     drawingRef.current = { frameId: frame.id, strokeId, pending: [], lastX: x, lastY: y, raf: 0 }
   }

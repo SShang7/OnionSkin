@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { WebSocketServer } from 'ws'
-import { applyOp, STROKE_OPS, FRAME_OPS, CANVAS_W, CANVAS_H } from '../shared/ops.js'
+import { applyOp, normalizeDoc, STROKE_OPS, FRAME_OPS, LAYER_OPS, CANVAS_W, CANVAS_H, MAX_LAYER_NAME } from '../shared/ops.js'
 import { projects } from './db.js'
 import { userFromRequest } from './auth.js'
 import { dailyInfo } from './daily.js'
@@ -21,8 +21,9 @@ function loadRoom(id) {
     clearTimeout(room.unloadTimer)
     return room
   }
-  const doc = projects.loadDoc(id)
-  if (!doc) return null
+  const loaded = projects.loadDoc(id)
+  if (!loaded) return null
+  const doc = normalizeDoc(loaded)
   room = { id, doc, clients: new Map(), colorIndex: 0, dirty: false, saveTimer: null, unloadTimer: null, timer: null }
   rooms.set(id, room)
   return room
@@ -199,6 +200,7 @@ function sanitizeOp(msg, me) {
         stroke: {
           id: s.id,
           by: me.id,
+          layer: isId(s.layer) ? s.layer : '',
           tool: s.tool === 'eraser' ? 'eraser' : 'pen',
           color: /^#[0-9a-f]{6}$/i.test(s.color) ? s.color : '#000000',
           size: isNum(s.size) ? Math.min(200, Math.max(1, s.size)) : 4,
@@ -212,9 +214,27 @@ function sanitizeOp(msg, me) {
       return { type: msg.type, frameId: msg.frameId, strokeId: msg.strokeId, points: msg.points }
     case 'stroke_remove':
     case 'frame_delete':
-    case 'frame_clear':
       if (!isId(msg.frameId)) return null
       return { type: msg.type, frameId: msg.frameId, strokeId: isId(msg.strokeId) ? msg.strokeId : undefined }
+    case 'frame_clear':
+      if (!isId(msg.frameId)) return null
+      return { type: msg.type, frameId: msg.frameId, layerId: isId(msg.layerId) ? msg.layerId : undefined }
+    case 'layer_add': {
+      const name = cleanText(msg.name, MAX_LAYER_NAME)
+      if (!isId(msg.layerId) || !name) return null
+      return { type: msg.type, layerId: msg.layerId, name, index: isNum(msg.index) ? Math.floor(msg.index) : undefined }
+    }
+    case 'layer_delete':
+      if (!isId(msg.layerId)) return null
+      return { type: msg.type, layerId: msg.layerId }
+    case 'layer_move':
+      if (!isId(msg.layerId) || !isNum(msg.index)) return null
+      return { type: msg.type, layerId: msg.layerId, index: Math.floor(msg.index) }
+    case 'layer_rename': {
+      const name = cleanText(msg.name, MAX_LAYER_NAME)
+      if (!isId(msg.layerId) || !name) return null
+      return { type: msg.type, layerId: msg.layerId, name }
+    }
     case 'frame_add':
       if (!isId(msg.frameId)) return null
       return {
@@ -323,7 +343,7 @@ export function attachRooms(server) {
       }
       markDirty(room)
       if (STROKE_OPS.has(op.type)) broadcast(room, op, ws)
-      else if (FRAME_OPS.has(op.type)) broadcast(room, op)
+      else if (FRAME_OPS.has(op.type) || LAYER_OPS.has(op.type)) broadcast(room, op)
     })
 
     ws.on('close', () => {

@@ -2,15 +2,40 @@
 // Used by both the server (authoritative copy) and the client (local copy),
 // so every participant applies edits the same way.
 //
-// doc = { frames: [{ id, rev, strokes: [{ id, by, tool, color, size, points: [x, y, x, y, ...] }] }] }
+// doc = {
+//   layers: [{ id, name }],  // bottom to top; every frame has the same layers
+//   frames: [{ id, rev, strokes: [{ id, by, layer, tool, color, size, opacity, points: [x, y, x, y, ...] }] }],
+// }
 
 export const CANVAS_W = 1280
 export const CANVAS_H = 720
 export const MAX_FRAMES = 300
 export const MAX_POINTS_PER_STROKE = 20000
+export const MAX_LAYERS = 12
+export const MAX_LAYER_NAME = 24
+const FIRST_LAYER = { id: 'layer-1', name: 'Layer 1' }
 
 export function createFrame(id) {
   return { id, rev: 0, strokes: [] }
+}
+
+/** A new document: one empty frame on one layer. */
+export function createDoc(frameId) {
+  return { layers: [{ ...FIRST_LAYER }], frames: [createFrame(frameId)] }
+}
+
+/** Upgrades documents saved before layers existed: everything goes on one layer. */
+export function normalizeDoc(doc) {
+  if (!Array.isArray(doc.layers) || doc.layers.length === 0) doc.layers = [{ ...FIRST_LAYER }]
+  const ids = new Set(doc.layers.map((l) => l.id))
+  for (const frame of doc.frames) {
+    for (const stroke of frame.strokes) if (!ids.has(stroke.layer)) stroke.layer = doc.layers[0].id
+  }
+  return doc
+}
+
+function findLayerIndex(doc, id) {
+  return doc.layers.findIndex((l) => l.id === id)
 }
 
 function findFrame(doc, id) {
@@ -23,6 +48,7 @@ export function applyOp(doc, op) {
     case 'stroke_start': {
       const frame = findFrame(doc, op.frameId)
       if (!frame || frame.strokes.some((s) => s.id === op.stroke.id)) return false
+      if (findLayerIndex(doc, op.stroke.layer) < 0) return false
       frame.strokes.push({ ...op.stroke, points: [...op.stroke.points] })
       frame.rev++
       return true
@@ -70,10 +96,47 @@ export function applyOp(doc, op) {
       return true
     }
     case 'frame_clear': {
+      // With a layerId, clears just that layer on the frame.
       const frame = findFrame(doc, op.frameId)
-      if (!frame || frame.strokes.length === 0) return false
-      frame.strokes = []
+      if (!frame) return false
+      const kept = op.layerId ? frame.strokes.filter((s) => s.layer !== op.layerId) : []
+      if (kept.length === frame.strokes.length) return false
+      frame.strokes = kept
       frame.rev++
+      return true
+    }
+    case 'layer_add': {
+      if (doc.layers.length >= MAX_LAYERS || findLayerIndex(doc, op.layerId) >= 0) return false
+      op.index = Math.max(0, Math.min(doc.layers.length, op.index ?? doc.layers.length))
+      doc.layers.splice(op.index, 0, { id: op.layerId, name: op.name })
+      return true
+    }
+    case 'layer_delete': {
+      const i = findLayerIndex(doc, op.layerId)
+      if (i < 0 || doc.layers.length <= 1) return false
+      doc.layers.splice(i, 1)
+      // Its drawings go with it, on every frame.
+      for (const frame of doc.frames) {
+        const kept = frame.strokes.filter((s) => s.layer !== op.layerId)
+        if (kept.length !== frame.strokes.length) {
+          frame.strokes = kept
+          frame.rev++
+        }
+      }
+      return true
+    }
+    case 'layer_move': {
+      const from = findLayerIndex(doc, op.layerId)
+      if (from < 0) return false
+      const [layer] = doc.layers.splice(from, 1)
+      op.index = Math.max(0, Math.min(doc.layers.length, op.index))
+      doc.layers.splice(op.index, 0, layer)
+      return true
+    }
+    case 'layer_rename': {
+      const layer = doc.layers[findLayerIndex(doc, op.layerId)]
+      if (!layer || layer.name === op.name) return false
+      layer.name = op.name
       return true
     }
     default:
@@ -86,3 +149,5 @@ export function applyOp(doc, op) {
 // them to everyone (sender included) to keep frame order identical.
 export const STROKE_OPS = new Set(['stroke_start', 'stroke_points', 'stroke_remove'])
 export const FRAME_OPS = new Set(['frame_add', 'frame_delete', 'frame_move', 'frame_clear'])
+// Layer edits also go through the server first, so everyone has the same layer order.
+export const LAYER_OPS = new Set(['layer_add', 'layer_delete', 'layer_move', 'layer_rename'])

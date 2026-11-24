@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import { applyOp, STROKE_OPS, FRAME_OPS } from '../../../shared/ops.js'
+import { applyOp, STROKE_OPS, FRAME_OPS, LAYER_OPS } from '../../../shared/ops.js'
 
 export function uid() {
   return crypto.randomUUID()
@@ -34,7 +34,7 @@ function localTimer(timer) {
 export function useRoom(projectId, guestName) {
   // A stable, mutable store: strokes change on every pointer move, so React
   // only re-renders via `version`, not by copying the document.
-  const [store] = useState(() => ({ doc: { frames: [] } }))
+  const [store] = useState(() => ({ doc: { layers: [], frames: [] } }))
   const wsRef = useRef(null)
   const listenersRef = useRef(new Set())
   const [version, bump] = useReducer((v) => v + 1, 0)
@@ -129,7 +129,7 @@ export function useRoom(projectId, guestName) {
             } else console.error('Server error:', msg.message)
             break
           default:
-            if (STROKE_OPS.has(msg.type) || FRAME_OPS.has(msg.type)) {
+            if (STROKE_OPS.has(msg.type) || FRAME_OPS.has(msg.type) || LAYER_OPS.has(msg.type)) {
               // Listeners see the document as it was just before this op.
               for (const fn of listenersRef.current) fn(msg, store.doc)
               applyOp(store.doc, msg)

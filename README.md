@@ -8,6 +8,8 @@ Every day there's a new **daily prompt**, the same for everyone, such as "A flow
 
 For timed practice like gesture drawing, use **Timer** in the editor. Anyone in the project can start one, and everyone sees the same countdown. Pick a preset or type a time such as `1:30`, `45s`, or `2`, which means 2 minutes. Turn on **Repeat rounds** to restart the countdown each time it ends. With **New frame each round**, a blank frame is added at the end of each round and everyone moves to it, so each pose gets its own frame. A chime plays when time is up; each person can turn it off for themselves. If everyone leaves, the timer pauses.
 
+Use **Layers** (the stacked-squares button in the toolbar) to draw on separate layers, such as a background, a rough sketch, and clean lines. Layers are shared by every frame and everyone in the project. Click a layer to draw on it, and the eraser only erases that layer. Double-click a name to rename it, and drag layers or use the arrows to reorder them. The eye button hides a layer only for you; hidden layers are also left out of your GIF export. Clear frame clears only the layer you're on, and deleting a layer removes its drawings from every frame.
+
 To save the animation, click **GIF** in the editor. Choose a size (480×270, 640×360 or 1280×720) and a speed, then click **Export** to download a looping GIF on a white background. The export runs in your browser, so nothing is uploaded.
 
 ## Run it
@@ -78,10 +80,11 @@ Drag thumbnails in the timeline to reorder frames.
   - `db.js`: the SQLite schema and queries, using Node's built-in `node:sqlite`. Older databases get new columns added on startup.
   - `daily.js`: the prompt for each date (a stored AI prompt, or the built-in list as a fallback) and streak counting.
   - `promptgen.js`: asks Claude for new batches of prompts and stores them ahead of time. `prompts-cli.js` is the review script.
-- `shared/ops.js`: the document model and the operations that change it (`stroke_start`, `stroke_points`, `stroke_remove`, `frame_add`, `frame_delete`, `frame_move`, `frame_clear`). Both server and client apply operations with the same code.
-- Strokes are applied locally first and relayed to everyone else, so drawing feels instant. Frame operations go through the server first and are echoed to everyone, so every client sees the same frame order.
+- `shared/ops.js`: the document model and the operations that change it (`stroke_start`, `stroke_points`, `stroke_remove`, `frame_add`, `frame_delete`, `frame_move`, `frame_clear`, and `layer_add`, `layer_delete`, `layer_move`, `layer_rename`). Both server and client apply operations with the same code. Projects saved before layers existed are put on a single layer when opened.
+- Strokes are applied locally first and relayed to everyone else, so drawing feels instant. Frame and layer operations go through the server first and are echoed to everyone, so every client sees the same frame order.
 - `frontend/`: a React and Vite app.
   - `src/lib/useRoom.js` handles the live connection and keeps the local copy in sync.
+  - `src/lib/render.js` draws frames one layer at a time, so an eraser stroke only affects its own layer.
   - `src/lib/api.js` calls the HTTP API.
   - `Projects.jsx`, `Welcome.jsx`, and `GuestJoin.jsx` are the screens outside the editor.
   - `Board.jsx`, `Stage.jsx`, and `Timeline.jsx` make up the editor.

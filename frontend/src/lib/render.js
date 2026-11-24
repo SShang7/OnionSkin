@@ -41,11 +41,29 @@ function makeCanvas(w = CANVAS_W, h = CANVAS_H) {
   return c
 }
 
-/** Renders a frame's strokes onto a transparent canvas, optionally tinted one color. */
-export function renderLayer(canvas, frame, tint) {
+let layerScratch = null
+
+/**
+ * Renders a frame onto a transparent canvas, one layer at a time from the bottom
+ * up, so an eraser only erases its own layer. `layerIds` lists the layers to
+ * draw, in order (hidden layers left out). Optionally tints everything one colour.
+ */
+export function renderFrame(canvas, frame, layerIds, tint) {
   const ctx = canvas.getContext('2d')
   ctx.clearRect(0, 0, canvas.width, canvas.height)
-  for (const s of frame.strokes) drawStroke(ctx, s)
+  if (layerIds.length === 1) {
+    for (const s of frame.strokes) if (s.layer === layerIds[0]) drawStroke(ctx, s)
+  } else {
+    layerScratch ??= makeCanvas()
+    const lctx = layerScratch.getContext('2d')
+    for (const id of layerIds) {
+      const strokes = frame.strokes.filter((s) => s.layer === id)
+      if (strokes.length === 0) continue
+      lctx.clearRect(0, 0, CANVAS_W, CANVAS_H)
+      for (const s of strokes) drawStroke(lctx, s)
+      ctx.drawImage(layerScratch, 0, 0)
+    }
+  }
   if (tint) {
     ctx.save()
     ctx.globalCompositeOperation = 'source-in'
@@ -57,36 +75,35 @@ export function renderLayer(canvas, frame, tint) {
 }
 
 // Small cache so the current frame and its onion-skin neighbours are only
-// re-rendered when they actually change.
-const layerCache = new Map() // key -> { rev, canvas }
-const MAX_CACHED_LAYERS = 6
+// re-rendered when they (or the visible layers) actually change.
+const imageCache = new Map() // key -> { rev, layersKey, canvas }
+const MAX_CACHED_IMAGES = 6
 
-export function getLayer(frame, tint = null) {
+export function getFrameImage(frame, layerIds, tint = null) {
   const key = `${frame.id}|${tint ?? ''}`
-  let entry = layerCache.get(key)
-  if (entry && entry.rev === frame.rev) {
-    layerCache.delete(key)
-    layerCache.set(key, entry) // mark as recently used
+  const layersKey = layerIds.join(',')
+  let entry = imageCache.get(key)
+  if (entry && entry.rev === frame.rev && entry.layersKey === layersKey) {
+    imageCache.delete(key)
+    imageCache.set(key, entry) // mark as recently used
     return entry.canvas
   }
   if (!entry) {
-    if (layerCache.size >= MAX_CACHED_LAYERS) {
-      const oldest = layerCache.keys().next().value
-      layerCache.delete(oldest)
-    }
-    entry = { rev: -1, canvas: makeCanvas() }
+    if (imageCache.size >= MAX_CACHED_IMAGES) imageCache.delete(imageCache.keys().next().value)
+    entry = { rev: -1, layersKey: null, canvas: makeCanvas() }
   }
-  renderLayer(entry.canvas, frame, tint)
+  renderFrame(entry.canvas, frame, layerIds, tint)
   entry.rev = frame.rev
-  layerCache.set(key, entry)
+  entry.layersKey = layersKey
+  imageCache.set(key, entry)
   return entry.canvas
 }
 
 let scratch = null
-/** Draws a small preview of a frame on a white background. */
-export function renderThumbnail(canvas, frame) {
+/** Draws a frame scaled onto a canvas of any size, on a white background. */
+export function renderThumbnail(canvas, frame, layerIds) {
   scratch ??= makeCanvas()
-  renderLayer(scratch, frame)
+  renderFrame(scratch, frame, layerIds)
   const ctx = canvas.getContext('2d')
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, canvas.width, canvas.height)

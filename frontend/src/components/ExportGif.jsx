@@ -19,7 +19,7 @@ function fileName(title) {
 }
 
 /** Dialog that exports the project's frames as an animated GIF and downloads it. */
-export default function ExportGif({ frames, fps: initialFps, loop: initialLoop = true, title, onClose }) {
+export default function ExportGif({ frames, layerIds, hiddenCount = 0, fps: initialFps, loop: initialLoop = true, title, onClose }) {
   const [size, setSize] = useState('medium')
   const [fps, setFps] = useState(initialFps)
   const [loop, setLoop] = useState(initialLoop)
@@ -67,7 +67,7 @@ export default function ExportGif({ frames, fps: initialFps, loop: initialLoop =
     try {
       // Copy the frame list so edits made by others during export don't shift it.
       const snapshot = frames.map((f) => ({ ...f, strokes: [...f.strokes] }))
-      const blob = await encodeGif(snapshot, { width, height, fps, loop, signal: controller.signal, onProgress: setProgress })
+      const blob = await encodeGif(snapshot, { layerIds, width, height, fps, loop, signal: controller.signal, onProgress: setProgress })
       const name = fileName(title)
       downloadBlob(blob, name)
       setResult({ blob, name })
@@ -118,6 +118,7 @@ export default function ExportGif({ frames, fps: initialFps, loop: initialLoop =
 
         <p className="export-summary">
           {frames.length} {frames.length === 1 ? 'frame' : 'frames'} · {seconds < 10 ? seconds.toFixed(1) : Math.round(seconds)} seconds
+          {hiddenCount > 0 ? ` · ${hiddenCount} hidden ${hiddenCount === 1 ? 'layer' : 'layers'} left out` : ''}
           {size === 'large' && frames.length > 60 ? ' · large GIFs with many frames take a while' : ''}
         </p>
 
