@@ -1,12 +1,5 @@
 import { useState } from 'react'
-
-/** Accepts "#rgb", "rgb", "#rrggbb" or "rrggbb" and returns "#rrggbb", or null if invalid. */
-function parseHex(text) {
-  const m = text.trim().replace(/^#/, '').toLowerCase()
-  if (/^[0-9a-f]{6}$/.test(m)) return `#${m}`
-  if (/^[0-9a-f]{3}$/.test(m)) return `#${[...m].map((c) => c + c).join('')}`
-  return null
-}
+import { parseHex } from '../lib/color.js'
 
 /**
  * Text field for a hex colour. While typing it shows your draft; a valid

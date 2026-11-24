@@ -6,7 +6,7 @@ import Stage from './Stage.jsx'
 import Timeline from './Timeline.jsx'
 import Icon from './Icon.jsx'
 import Logo from './Logo.jsx'
-import HexInput from './HexInput.jsx'
+import ColorPicker from './ColorPicker.jsx'
 import ProjectTitle from './ProjectTitle.jsx'
 import TimerControl from './TimerControl.jsx'
 import { formatDay } from '../lib/daily.js'
@@ -325,18 +325,9 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
                 aria-label={`Color ${c}`}
               />
             ))}
-            <label className="swatch swatch-custom" title="Custom color" style={{ background: SWATCHES.includes(color) ? undefined : color }}>
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => {
-                  setColor(e.target.value)
-                  setTool('pen')
-                }}
-              />
-            </label>
-            <HexInput
+            <ColorPicker
               value={color}
+              active={!SWATCHES.includes(color)}
               onChange={(c) => {
                 setColor(c)
                 setTool('pen')
