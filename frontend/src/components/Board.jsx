@@ -9,6 +9,7 @@ import Logo from './Logo.jsx'
 import ColorPicker from './ColorPicker.jsx'
 import ProjectTitle from './ProjectTitle.jsx'
 import TimerControl from './TimerControl.jsx'
+import ExportGif from './ExportGif.jsx'
 import { formatDay } from '../lib/daily.js'
 
 const SWATCHES = ['#111111', '#e03131', '#f08c00', '#2f9e44', '#1971c2', '#7048e8', '#d6336c', '#868e96']
@@ -28,7 +29,9 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
   const [playing, setPlaying] = useState(false)
   const [playIndex, setPlayIndex] = useState(0)
   const [fps, setFps] = useState(8)
+  const [loop, setLoop] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const currentIndex = Math.max(0, frames.findIndex((f) => f.id === currentId))
   const current = frames[currentIndex]
@@ -86,14 +89,24 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
     [send, currentFrameId],
   )
 
-  // Playback loop.
-  const frameCountRef = useRef(frames.length)
+  // Playback. With looping off, it stops on the last frame.
+  const playbackRef = useRef(null)
   useEffect(() => {
-    frameCountRef.current = frames.length
+    playbackRef.current = { frames, loop, playIndex }
   })
   useEffect(() => {
     if (!playing) return
-    const t = setInterval(() => setPlayIndex((i) => (i + 1) % Math.max(1, frameCountRef.current)), 1000 / fps)
+    const t = setInterval(() => {
+      const { frames, loop, playIndex } = playbackRef.current
+      const next = playIndex + 1
+      if (next < frames.length) setPlayIndex(next)
+      else if (loop) setPlayIndex(0)
+      else {
+        // Played through once: stop and stay on the last frame.
+        setPlaying(false)
+        setCurrentId(frames.at(-1)?.id ?? null)
+      }
+    }, 1000 / fps)
     return () => clearInterval(t)
   }, [playing, fps])
 
@@ -130,7 +143,8 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
   }
 
   const togglePlay = () => {
-    if (!playing) setPlayIndex(currentIndex)
+    // Without looping, pressing play on the last frame starts again from the first.
+    if (!playing) setPlayIndex(!loop && currentIndex === frames.length - 1 ? 0 : currentIndex)
     else setCurrentId(frames[shownIndex]?.id ?? currentId)
     setPlaying(!playing)
   }
@@ -201,6 +215,7 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
       } else if (k === 'b' || k === 'p') setTool('pen')
       else if (k === 'e') setTool('eraser')
       else if (k === 'o') setOnion((v) => !v)
+      else if (k === 'l') setLoop((v) => !v)
       else if (k === 'n') a.addFrame()
       else if (k === 'd') a.duplicate()
       else if (k === ',' || k === 'arrowleft') a.select(a.currentIndex - 1)
@@ -295,6 +310,10 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
             </li>
           ))}
         </ul>
+        <button className="btn export-button" onClick={() => setExporting(true)} title="Export the animation as a GIF">
+          <Icon name="download" size={15} />
+          <span>GIF</span>
+        </button>
         <button className="btn btn-primary invite-button" onClick={copyInvite} title="Copy a link anyone can use to join">
           <Icon name="link" size={15} />
           <span>{copied ? 'Link copied!' : 'Invite'}</span>
@@ -407,7 +426,11 @@ export default function Board({ projectId, guestName, signedIn, onExit }) {
         onMove={(id, index) => frameOp({ type: 'frame_move', frameId: id, index })}
         onTogglePlay={togglePlay}
         onFps={setFps}
+        loop={loop}
+        onLoop={setLoop}
       />
+
+      {exporting && <ExportGif frames={frames} fps={fps} loop={loop} title={project.title} onClose={() => setExporting(false)} />}
     </div>
   )
 }

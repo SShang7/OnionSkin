@@ -24,6 +24,8 @@ export default function Timeline({
   onMove,
   onTogglePlay,
   onFps,
+  loop,
+  onLoop,
 }) {
   const [dragOver, setDragOver] = useState(null)
   const activeRef = useRef(null)
@@ -42,6 +44,10 @@ export default function Timeline({
         <label className="fps" title="Playback speed">
           <input type="range" min="1" max="24" value={fps} onChange={(e) => onFps(Number(e.target.value))} />
           <span className="mono">{fps} fps</span>
+        </label>
+        <label className="loop-toggle" title="Loop playback, or play through once and stop (L)">
+          <input type="checkbox" checked={loop} onChange={(e) => onLoop(e.target.checked)} />
+          Loop
         </label>
         <span className="frame-count mono">
           {shownIndex + 1} / {frames.length}

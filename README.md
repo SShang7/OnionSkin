@@ -8,6 +8,8 @@ Every day there's a new **daily prompt**, the same for everyone, such as "A flow
 
 For timed practice like gesture drawing, use **Timer** in the editor. Anyone in the project can start one, and everyone sees the same countdown. Pick a preset or type a time such as `1:30`, `45s`, or `2`, which means 2 minutes. Turn on **Repeat rounds** to restart the countdown each time it ends. With **New frame each round**, a blank frame is added at the end of each round and everyone moves to it, so each pose gets its own frame. A chime plays when time is up; each person can turn it off for themselves. If everyone leaves, the timer pauses.
 
+To save the animation, click **GIF** in the editor. Choose a size (480×270, 640×360 or 1280×720) and a speed, then click **Export** to download a looping GIF on a white background. The export runs in your browser, so nothing is uploaded.
+
 ## Run it
 
 ```powershell
@@ -62,6 +64,7 @@ Set `DAILY_PROMPTS_AI=off` to turn this off, or `DAILY_PROMPTS_MODEL` to use a d
 | `N` / `D` | New blank frame / duplicate frame |
 | `,` `.` or `←` `→` | Previous / next frame |
 | `O` | Toggle onion skin |
+| `L` | Toggle looping (off: play through once and stop) |
 | `Space` | Play / pause |
 
 Drag thumbnails in the timeline to reorder frames.
